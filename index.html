@@ -108,6 +108,8 @@
 
     let recognition;
     let isListening = false;
+    let isFetching = false;
+    let abortController = null;
 
     function addMessage(text, sender) {
       const msgDiv = document.createElement('div');
@@ -120,15 +122,24 @@
     async function sendMessage(text) {
       addMessage(text, 'user');
 
+      abortController = new AbortController();
+      const signal = abortController.signal;
+
       try {
+        isFetching = true;
+        sendBtn.textContent = "Stop";
+        sendBtn.disabled = false;
+
         const res = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: "text", message: text })
+          body: JSON.stringify({ type: "text", message: text }),
+          signal
         });
 
         if (!res.ok) {
           addMessage("Error: " + res.statusText, 'bot');
+          resetSendButton();
           return;
         }
 
@@ -139,20 +150,49 @@
         speakText(botReply);
 
       } catch (err) {
-        addMessage("Error contacting server.", 'bot');
+        if (err.name === 'AbortError') {
+          addMessage("Chat stopped by user.", 'bot');
+        } else {
+          addMessage("Error contacting server.", 'bot');
+        }
+      } finally {
+        // We don't reset button here because speech might still be ongoing.
+        // Reset handled on speech end or on Stop click.
+        isFetching = false;
       }
     }
 
     function speakText(text) {
       if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // cancel any ongoing speech before new one
         const utterance = new SpeechSynthesisUtterance(text);
+        utterance.onend = () => {
+          resetSendButton();
+        }
         window.speechSynthesis.speak(utterance);
+      } else {
+        // If no speech synthesis, reset button immediately
+        resetSendButton();
       }
+    }
+
+    function resetSendButton() {
+      sendBtn.textContent = "Send";
+      sendBtn.disabled = false;
     }
 
     sendBtn.addEventListener('click', () => {
       if (isListening) {
         stopRecognition();
+        return;
+      }
+
+      if (isFetching) {
+        // User clicked Stop
+        if (abortController) abortController.abort();
+        window.speechSynthesis.cancel();
+        resetSendButton();
+        isFetching = false;
         return;
       }
 
@@ -212,7 +252,6 @@
       recognition.onend = () => {
         listeningIndicator.style.display = 'none';
         if (isListening) {
-          // Unexpected end, try to restart
           recognition.start();
         } else {
           sendBtn.textContent = "Send";
