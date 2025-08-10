@@ -1,6 +1,6 @@
 import os
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -22,6 +22,11 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     type: str  # frontend can send 'text' or 'voice' — backend ignores this for now
     message: str
+
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    # Manually respond to all OPTIONS preflight requests with no content
+    return Response(status_code=204)
 
 @app.post("/chat")
 async def chat_endpoint(chat_request: ChatRequest):
