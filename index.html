@@ -40,6 +40,7 @@
     #messages {
       display: flex;
       flex-direction: column;
+      aria-live: polite;
     }
 
     #inputArea {
@@ -88,7 +89,7 @@
 <body>
 
   <div id="chatbox">
-    <div id="messages"></div>
+    <div id="messages" aria-live="polite"></div>
     <div id="inputArea">
       <input type="text" id="inputText" placeholder="Type your message here..." />
       <button id="voiceBtn" title="Speak">🎤</button>
@@ -118,7 +119,7 @@
       msgDiv.className = 'message ' + sender;
       msgDiv.textContent = text;
       messagesDiv.appendChild(msgDiv);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      msgDiv.scrollIntoView({ behavior: 'smooth' });
     }
 
     async function sendMessage(text) {
@@ -174,6 +175,11 @@
           resetSendButton();
         };
 
+        utterance.onerror = () => {
+          isSpeaking = false;
+          resetSendButton();
+        };
+
         window.speechSynthesis.speak(utterance);
       } else {
         resetSendButton();
@@ -192,12 +198,15 @@
       }
 
       if (isFetching || isSpeaking) {
-        // User clicked Stop — abort fetch and cancel speech
-        if (abortController) abortController.abort();
+        if (abortController) {
+          abortController.abort();
+          abortController = null;
+        }
         window.speechSynthesis.cancel();
         isSpeaking = false;
         resetSendButton();
         isFetching = false;
+        sendBtn.disabled = true; // prevent rapid clicks after stopping
         return;
       }
 
