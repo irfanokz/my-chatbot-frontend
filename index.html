@@ -104,8 +104,10 @@
     const voiceBtn = document.getElementById('voiceBtn');
     const listeningIndicator = document.getElementById('listeningIndicator');
 
-    // Your backend API URL:
     const API_URL = "https://my-chatbot-backend-production-e2ca.up.railway.app/chat";
+
+    let recognition;
+    let isListening = false;
 
     function addMessage(text, sender) {
       const msgDiv = document.createElement('div');
@@ -149,6 +151,11 @@
     }
 
     sendBtn.addEventListener('click', () => {
+      if (isListening) {
+        stopRecognition();
+        return;
+      }
+
       const text = inputText.value.trim();
       if (text) {
         sendMessage(text);
@@ -162,56 +169,72 @@
       }
     });
 
-    // Voice input with Web Speech API
-    voiceBtn.addEventListener('click', () => {
+    function startRecognition() {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         alert('Speech recognition not supported in this browser.');
         return;
       }
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
-      let retryCount = 0;
-
-      function startRecognition() {
-        listeningIndicator.style.display = 'inline';
-        recognition.start();
-      }
+      recognition.start();
+      isListening = true;
+      sendBtn.textContent = "Stop";
+      listeningIndicator.style.display = 'inline';
 
       recognition.onresult = (event) => {
-        listeningIndicator.style.display = 'none';
         const speechResult = event.results[0][0].transcript;
         inputText.value = speechResult;
+        sendBtn.textContent = "Send";
+        listeningIndicator.style.display = 'none';
+        isListening = false;
+        recognition.stop();
         sendBtn.click();
-        retryCount = 0; // reset retry count after success
       };
 
       recognition.onerror = (event) => {
         listeningIndicator.style.display = 'none';
+        sendBtn.textContent = "Send";
+        isListening = false;
 
         if (event.error === 'no-speech') {
-          if (retryCount < 1) {
-            retryCount++;
-            alert('No speech detected, please try again.');
-            startRecognition();
-          } else {
-            alert('No speech detected twice. Please check your microphone and try again later.');
-          }
+          alert('No speech detected. Please try again.');
         } else {
-          alert('Error with speech recognition: ' + event.error);
+          alert('Speech recognition error: ' + event.error);
+        }
+        recognition.stop();
+      };
+
+      recognition.onend = () => {
+        listeningIndicator.style.display = 'none';
+        if (isListening) {
+          // Unexpected end, try to restart
+          recognition.start();
+        } else {
+          sendBtn.textContent = "Send";
         }
       };
+    }
 
-      recognition.onspeechend = () => {
+    function stopRecognition() {
+      if (recognition) {
         recognition.stop();
-        listeningIndicator.style.display = 'none';
-      };
+      }
+      isListening = false;
+      sendBtn.textContent = "Send";
+      listeningIndicator.style.display = 'none';
+    }
 
-      startRecognition();
+    voiceBtn.addEventListener('click', () => {
+      if (!isListening) {
+        startRecognition();
+      } else {
+        stopRecognition();
+      }
     });
   </script>
 
