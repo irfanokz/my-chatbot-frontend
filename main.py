@@ -9,11 +9,12 @@ load_dotenv()
 app = FastAPI()
 
 class ChatRequest(BaseModel):
-    type: str  # 'text' or 'voice' — frontend can send this, backend doesn’t have to use it
+    type: str  # frontend can send 'text' or 'voice' — backend ignores this for now
     message: str
 
 @app.post("/chat")
 async def chat_endpoint(chat_request: ChatRequest):
+    # Only process the text message
     response_text = get_together_ai_response(chat_request.message)
     return {"response": response_text}
 
