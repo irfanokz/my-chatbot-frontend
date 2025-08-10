@@ -45,6 +45,7 @@
     #inputArea {
       display: flex;
       margin-top: 10px;
+      align-items: center;
     }
 
     #inputText {
@@ -74,6 +75,13 @@
       background: #28a745;
       color: white;
     }
+
+    #listeningIndicator {
+      color: green;
+      margin-left: 10px;
+      font-weight: bold;
+      display: none;
+    }
   </style>
 </head>
 
@@ -85,6 +93,7 @@
       <input type="text" id="inputText" placeholder="Type your message here..." />
       <button id="voiceBtn" title="Speak">🎤</button>
       <button id="sendBtn">Send</button>
+      <div id="listeningIndicator">🎙️ Listening...</div>
     </div>
   </div>
 
@@ -93,6 +102,7 @@
     const inputText = document.getElementById('inputText');
     const sendBtn = document.getElementById('sendBtn');
     const voiceBtn = document.getElementById('voiceBtn');
+    const listeningIndicator = document.getElementById('listeningIndicator');
 
     // Your backend API URL:
     const API_URL = "https://my-chatbot-backend-production-e2ca.up.railway.app/chat";
@@ -112,7 +122,7 @@
         const res = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: "text", message: text })  // <-- Added type here
+          body: JSON.stringify({ type: "text", message: text })
         });
 
         if (!res.ok) {
@@ -165,17 +175,43 @@
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
-      recognition.start();
+      let retryCount = 0;
+
+      function startRecognition() {
+        listeningIndicator.style.display = 'inline';
+        recognition.start();
+      }
 
       recognition.onresult = (event) => {
+        listeningIndicator.style.display = 'none';
         const speechResult = event.results[0][0].transcript;
         inputText.value = speechResult;
         sendBtn.click();
+        retryCount = 0; // reset retry count after success
       };
 
       recognition.onerror = (event) => {
-        alert('Error with speech recognition: ' + event.error);
+        listeningIndicator.style.display = 'none';
+
+        if (event.error === 'no-speech') {
+          if (retryCount < 1) {
+            retryCount++;
+            alert('No speech detected, please try again.');
+            startRecognition();
+          } else {
+            alert('No speech detected twice. Please check your microphone and try again later.');
+          }
+        } else {
+          alert('Error with speech recognition: ' + event.error);
+        }
       };
+
+      recognition.onspeechend = () => {
+        recognition.stop();
+        listeningIndicator.style.display = 'none';
+      };
+
+      startRecognition();
     });
   </script>
 
