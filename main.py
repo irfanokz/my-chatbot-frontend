@@ -1,4 +1,5 @@
 import os
+import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -19,6 +20,5 @@ async def chat_endpoint(chat_request: ChatRequest):
     return {"response": response_text}
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))  # Changed default to 8080 for Railway
     uvicorn.run(app, host="0.0.0.0", port=port)
