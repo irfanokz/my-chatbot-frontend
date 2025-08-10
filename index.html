@@ -110,6 +110,8 @@
     let isListening = false;
     let isFetching = false;
     let abortController = null;
+    let isSpeaking = false;
+    let utterance = null;
 
     function addMessage(text, sender) {
       const msgDiv = document.createElement('div');
@@ -155,23 +157,25 @@
         } else {
           addMessage("Error contacting server.", 'bot');
         }
+        resetSendButton();
       } finally {
-        // We don't reset button here because speech might still be ongoing.
-        // Reset handled on speech end or on Stop click.
         isFetching = false;
       }
     }
 
     function speakText(text) {
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // cancel any ongoing speech before new one
-        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.cancel(); // stop any ongoing speech
+        utterance = new SpeechSynthesisUtterance(text);
+        isSpeaking = true;
+
         utterance.onend = () => {
+          isSpeaking = false;
           resetSendButton();
-        }
+        };
+
         window.speechSynthesis.speak(utterance);
       } else {
-        // If no speech synthesis, reset button immediately
         resetSendButton();
       }
     }
@@ -187,10 +191,11 @@
         return;
       }
 
-      if (isFetching) {
-        // User clicked Stop
+      if (isFetching || isSpeaking) {
+        // User clicked Stop — abort fetch and cancel speech
         if (abortController) abortController.abort();
         window.speechSynthesis.cancel();
+        isSpeaking = false;
         resetSendButton();
         isFetching = false;
         return;
