@@ -1,6 +1,7 @@
 import os
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from backend import get_together_ai_response
@@ -8,6 +9,15 @@ from backend import get_together_ai_response
 load_dotenv()
 
 app = FastAPI()
+
+# Add CORS middleware to allow frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For testing allow all origins; later restrict to your frontend URL if needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatRequest(BaseModel):
     type: str  # frontend can send 'text' or 'voice' — backend ignores this for now
