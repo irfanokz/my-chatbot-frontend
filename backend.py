@@ -15,9 +15,17 @@ def get_together_ai_response(prompt: str) -> str:
         data = {
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
             "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful AI assistant that explains things step-by-step, "
+                        "like ChatGPT-5. Break your answers into short sections, use clear formatting, "
+                        "bullet points, and examples where useful."
+                    )
+                },
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 150
+            "max_tokens": 500
         }
         response = requests.post(url, headers=headers, json=data)
 

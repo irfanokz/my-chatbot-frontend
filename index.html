@@ -34,7 +34,6 @@
       overflow: hidden;
     }
 
-    /* Header */
     #header {
       background-color: #343541;
       color: white;
@@ -46,7 +45,6 @@
       letter-spacing: 0.05em;
     }
 
-    /* Messages container */
     #messages {
       flex-grow: 1;
       overflow-y: auto;
@@ -57,7 +55,6 @@
       background: #f7f8fa;
     }
 
-    /* Individual message bubble */
     .message {
       max-width: 75%;
       padding: 14px 20px;
@@ -71,7 +68,6 @@
       animation: fadeIn 0.2s ease forwards;
     }
 
-    /* User messages */
     .user {
       background-color: #10a37f;
       color: white;
@@ -79,7 +75,6 @@
       border-bottom-right-radius: 6px;
     }
 
-    /* Bot messages */
     .bot {
       background-color: white;
       color: #333;
@@ -87,7 +82,6 @@
       border-bottom-left-radius: 6px;
     }
 
-    /* Input area fixed at bottom */
     #inputArea {
       display: flex;
       align-items: center;
@@ -152,7 +146,6 @@
       background: #d4d4d4;
     }
 
-    /* Icons (SVG) */
     svg {
       width: 20px;
       height: 20px;
@@ -161,7 +154,6 @@
       fill: none;
     }
 
-    /* Listening indicator */
     #listeningIndicator {
       color: #10a37f;
       font-weight: 700;
@@ -171,7 +163,6 @@
       display: none;
     }
 
-    /* Scrollbar styling */
     #messages::-webkit-scrollbar {
       width: 6px;
     }
@@ -181,34 +172,25 @@
       border-radius: 4px;
     }
 
-    #messages::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    /* Animation */
     @keyframes fadeIn {
       from {
         opacity: 0;
         transform: translateY(6px);
       }
-
       to {
         opacity: 1;
         transform: translateY(0);
       }
     }
 
-    /* Responsive */
     @media (max-width: 480px) {
       #chatbox {
         height: 100vh;
         border-radius: 0;
       }
-
       #messages {
         padding: 16px 12px;
       }
-
       .message {
         max-width: 85%;
         padding: 12px 16px;
@@ -220,12 +202,11 @@
 
 <body>
   <div id="chatbox">
-    <div id="header">Your AI </div>
-    <div id="messages" aria-live="polite" aria-atomic="false"></div>
+    <div id="header">Your AI</div>
+    <div id="messages" aria-live="polite"></div>
     <div id="inputArea">
       <input type="text" id="inputText" placeholder="Type your message here..." autocomplete="off" />
-      <button id="voiceBtn" title="Speak message" aria-label="Speak message" type="button">
-        <!-- Microphone SVG -->
+      <button id="voiceBtn" title="Speak message" type="button">
         <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 1v11a3 3 0 0 1-6 0V1" />
           <path d="M12 1v11a3 3 0 0 0 6 0V1" />
@@ -234,8 +215,7 @@
           <path d="M8 21h8a4 4 0 0 1-8 0z" />
         </svg>
       </button>
-      <button id="sendBtn" title="Send message" aria-label="Send message" type="button">
-        <!-- Send SVG -->
+      <button id="sendBtn" title="Send message" type="button">
         <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
           <line x1="22" y1="2" x2="11" y2="13" />
           <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -258,8 +238,6 @@
     let isListening = false;
     let isFetching = false;
     let abortController = null;
-    let isSpeaking = false;
-    let utterance = null;
 
     function addMessage(text, sender) {
       const msgDiv = document.createElement('div');
@@ -267,6 +245,7 @@
       msgDiv.textContent = text;
       messagesDiv.appendChild(msgDiv);
       msgDiv.scrollIntoView({ behavior: 'smooth' });
+      return msgDiv;
     }
 
     async function sendMessage(text) {
@@ -293,12 +272,21 @@
           return;
         }
 
-        const data = await res.json();
-        const botReply = data.response || "No response";
+        // Create bot message placeholder for streaming
+        const botDiv = addMessage("", 'bot');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
 
-        addMessage(botReply, 'bot');
-        speakText(botReply);
+        let botText = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          botText += decoder.decode(value, { stream: true });
+          botDiv.textContent = botText;
+          botDiv.scrollIntoView({ behavior: 'smooth' });
+        }
 
+        resetSendButton();
       } catch (err) {
         if (err.name === 'AbortError') {
           addMessage("Chat stopped by user.", 'bot');
@@ -308,28 +296,6 @@
         resetSendButton();
       } finally {
         isFetching = false;
-      }
-    }
-
-    function speakText(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // stop any ongoing speech
-        utterance = new SpeechSynthesisUtterance(text);
-        isSpeaking = true;
-
-        utterance.onend = () => {
-          isSpeaking = false;
-          resetSendButton();
-        };
-
-        utterance.onerror = () => {
-          isSpeaking = false;
-          resetSendButton();
-        };
-
-        window.speechSynthesis.speak(utterance);
-      } else {
-        resetSendButton();
       }
     }
 
@@ -343,20 +309,11 @@
         stopRecognition();
         return;
       }
-
-      if (isFetching || isSpeaking) {
-        if (abortController) {
-          abortController.abort();
-          abortController = null;
-        }
-        window.speechSynthesis.cancel();
-        isSpeaking = false;
+      if (isFetching) {
+        if (abortController) abortController.abort();
         resetSendButton();
-        isFetching = false;
-        sendBtn.disabled = true; // prevent rapid clicks after stopping
         return;
       }
-
       const text = inputText.value.trim();
       if (text) {
         sendMessage(text);
@@ -365,9 +322,7 @@
     });
 
     inputText.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        sendBtn.click();
-      }
+      if (e.key === 'Enter') sendBtn.click();
     });
 
     function startRecognition() {
@@ -375,7 +330,6 @@
         alert('Speech recognition not supported in this browser.');
         return;
       }
-
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
@@ -401,43 +355,26 @@
         listeningIndicator.style.display = 'none';
         sendBtn.textContent = "Send";
         isListening = false;
-
-        if (event.error === 'no-speech') {
-          alert('No speech detected. Please try again.');
-        } else {
-          alert('Speech recognition error: ' + event.error);
-        }
         recognition.stop();
       };
 
       recognition.onend = () => {
         listeningIndicator.style.display = 'none';
-        if (isListening) {
-          recognition.start();
-        } else {
-          sendBtn.textContent = "Send";
-        }
+        sendBtn.textContent = "Send";
       };
     }
 
     function stopRecognition() {
-      if (recognition) {
-        recognition.stop();
-      }
+      if (recognition) recognition.stop();
       isListening = false;
       sendBtn.textContent = "Send";
       listeningIndicator.style.display = 'none';
     }
 
     voiceBtn.addEventListener('click', () => {
-      if (!isListening) {
-        startRecognition();
-      } else {
-        stopRecognition();
-      }
+      if (!isListening) startRecognition();
+      else stopRecognition();
     });
   </script>
-
 </body>
-
 </html>

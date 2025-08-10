@@ -2,5 +2,7 @@ fastapi
 uvicorn[standard]
 requests
 python-dotenv
+playsound==1.2.2
 elevenlabs==2.9.1
 SpeechRecognition==3.14.3
+pydantic

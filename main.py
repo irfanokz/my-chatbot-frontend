@@ -1,39 +1,18 @@
-import os
-import uvicorn
-from fastapi import FastAPI, Response
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from dotenv import load_dotenv
-from backend import get_together_ai_response
+from fastapi.responses import StreamingResponse
+from together import Together
 
-load_dotenv()
-
-app = FastAPI()
-
-# Add CORS middleware to allow frontend requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # For testing allow all origins; later restrict to your frontend URL if needed
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class ChatRequest(BaseModel):
-    type: str  # frontend can send 'text' or 'voice' — backend ignores this for now
-    message: str
-
-@app.options("/{rest_of_path:path}")
-async def preflight_handler(rest_of_path: str):
-    # Manually respond to all OPTIONS preflight requests with no content
-    return Response(status_code=204)
+client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
 
 @app.post("/chat")
 async def chat_endpoint(chat_request: ChatRequest):
-    # Only process the text message
-    response_text = get_together_ai_response(chat_request.message)
-    return {"response": response_text}
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  # Changed default to 8080 for Railway
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    def generate():
+        stream = client.chat.completions.create(
+            model="meta-llama/Meta-Llama-3-70B-Instruct",
+            messages=[{"role": "user", "content": chat_request.message}],
+            stream=True
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.get("content", "")
+            if delta:
+                yield delta
+    return StreamingResponse(generate(), media_type="text/plain")
